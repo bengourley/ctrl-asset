@@ -1,0 +1,7 @@
+{
+  "name": "ctrl-asset",
+  "version": "0.0",
+  "dependencies": {
+    "gm": "~1.5"
+  }
+}
