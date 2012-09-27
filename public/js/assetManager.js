@@ -6,50 +6,49 @@
     , PaginatedCollection = require('PaginatedCollection')
     , PaginationView = require('PaginationView')
     , notification = require('notification')
-    , paginator;
+    , paginator
 
 
-  var Router = Backbone.Router.extend({
+  var Router = Backbone.Router.extend(
+    { routes:
+      { 'admin/asset': 'index'
+      , 'admin/asset/:page': 'page'
+      }
 
-    routes: {
-      'admin/asset': 'index',
-      'admin/asset/:page': 'page'
-    },
+    , index: function () {
+        paginator.collection.goTo(1)
+      }
 
-    index: function () {
-      paginator.collection.goTo(1);
-    },
+    , page: function (page) {
+        paginator.collection.goTo(parseInt(page, 10))
+      }
 
-    page: function (page) {
-      paginator.collection.goTo(parseInt(page, 10));
-    }
-
-  });
+    })
 
   var assetManager = new AssetManagerView({
     model: new AssetManagerModel()
-  }).render();
+  }).render()
 
-  var appRouter = new Router();
+  var appRouter = new Router()
 
-  paginator = new PaginationView({
-    collection: new PaginatedCollection(),
-    el: $('#asset-list'),
-    router: appRouter
-  });
+  paginator = new PaginationView(
+    { collection: new PaginatedCollection()
+    , el: $('#asset-list')
+    , router: appRouter
+    })
 
   assetManager.model.on('newAsset', function (asset) {
 
     notification
       .notify('Asset uploaded')
-      .effect('slide');
+      .effect('slide')
 
     // Reset the paginator view
-    var currentPage = paginator.collection.currentPage;
-    paginator.collection.goTo(currentPage);
+    var currentPage = paginator.collection.currentPage
+    paginator.collection.goTo(currentPage)
 
-  });
+  })
 
-  Backbone.history.start({ pushState: true });
+  Backbone.history.start({ pushState: true })
 
 }());

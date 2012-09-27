@@ -1,13 +1,18 @@
-module.exports = createRoutes;
+module.exports = createRoutes
 
-function createRoutes(serviceLocator, viewPath) {
+// Create the routes that facilitate
+// the CRUD functionality of the asset.
+function createRoutes(sl, viewPath) {
 
-  var viewRender = serviceLocator.viewRender(viewPath)
-    , compact = serviceLocator.compact
+  var viewRender = sl.viewRender(viewPath)
+    , compact = sl.compact
     , pagination = require('../../bundles/admin/lib/pagination')(
-        serviceLocator.assetModel.count, 3
-      );
+        sl.assetModel.count, 3
+      )
 
+
+  // Create a compact namespace and add all
+  // of the required frontend js files
   compact.addNamespace('admin-asset', __dirname + '/public')
     .addJs('js/deps/underscore.js')
     .addJs('js/deps/backbone.js')
@@ -24,28 +29,31 @@ function createRoutes(serviceLocator, viewPath) {
     .addJs('js/views/AssetItemDetailsView.js')
     .addJs('js/views/PaginationView.js')
     .addJs('js/notification.js')
-    .addJs('js/assetManager.js');
+    .addJs('js/assetManager.js')
 
+  // Different namespace for asset browser overlay,
+  // which can be included anywhere
   compact.addNamespace('admin-asset-browser', __dirname + '/public')
-    .addJs('js/assetBrowser.js');
+    .addJs('js/assetBrowser.js')
 
+  // Create access check middleware
+  // for a given action
   function assetAccess(action) {
-    return serviceLocator.adminAccessControl
-      .requiredAccess('Asset', action, '/admin/login');
+    return sl.adminAccessControl
+      .requiredAccess('Asset', action, '/admin/login')
   }
 
+  // Admin API routes
 
-  /*
-   * API routes
-   */
-  serviceLocator.router.get(
+  // List
+  sl.router.get(
     '/admin/asset/api',
     assetAccess('read'),
     function (req, res) {
 
       var list = req.query.type === 'image'
-        ? serviceLocator.assetModel.listImages
-        : serviceLocator.assetModel.list;
+        ? sl.assetModel.listImages
+        : sl.assetModel.list
 
       if (req.query.paginate) {
 
@@ -53,149 +61,147 @@ function createRoutes(serviceLocator, viewPath) {
 
           list(req.searchOptions, function (err, results) {
             if (!err) {
-              res.json({
-                pagination: res.locals.pagination,
-                results: results
-              });
+              res.json(
+                { pagination: res.locals.pagination
+                , results: results
+                })
             } else {
-              res.status(500).end('Format not supported');
+              res.status(500).end('Format not supported')
             }
-          });
+          })
 
-        });
+        })
 
       } else {
 
         list(function (err, results) {
           if (!err) {
             if (!req.query.format) {
-              res.json(results);
+              res.json(results)
             } else if (req.query.format === 'redactor') {
-              var redactorResponse = [];
+              var redactorResponse = []
               results.forEach(function (result) {
-                redactorResponse.push({
-                  thumb: '/asset/thumb/' + result._id + '/' + result.basename,
-                  image: '/asset/' + result._id + '/' + result.basename
-                });
-              });
-              res.json(redactorResponse);
+                redactorResponse.push(
+                  { thumb: '/asset/thumb/' + result._id + '/' + result.basename
+                  , image: '/asset/' + result._id + '/' + result.basename
+                  })
+              })
+              res.json(redactorResponse)
             }
           } else {
-            res.status(500).end('Format not supported');
+            res.status(500).end('Format not supported')
           }
-        });
+        })
       }
     }
-  );
+  )
 
-  serviceLocator.router.post(
+  // Upload
+  sl.router.post(
     '/admin/asset/api',
     assetAccess('create'),
-    serviceLocator.uploadDelegate.middleware,
+    sl.uploadDelegate.middleware,
     function (req, res) {
 
-      var fileField;
+      var fileField
 
-      ['file', 'files'].some(function (field) {
+      ;['file', 'files'].some(function (field) {
         if (req.body[field]) {
-          fileField = field;
-          return true;
+          fileField = field
+          return true
         } else {
-          return false;
+          return false
         }
-      });
+      })
 
       // We can accept multiple files, but
       // redactor can only send one
       var response = req.query.format === 'redactor' ? {} : []
-        , countdown = req.body[fileField].length;
+        , countdown = req.body[fileField].length
 
       // No files were found
       if (countdown === 0) {
-        return res.json(response);
+        return res.json(response)
       }
 
       req.body[fileField].forEach(function (file) {
 
-        serviceLocator.assetModel.create(file, {}, function (err, result) {
+        sl.assetModel.create(file, {}, function (err, result) {
           if (req.query.format === 'redactor') {
-            response.filelink = '/asset/' + result._id + '/' + result.basename;
+            response.filelink = '/asset/' + result._id + '/' + result.basename
           } else {
-            response.push(result);
+            response.push(result)
           }
-          countdown--;
+          countdown--
           if (countdown === 0) {
 
             if (req.query.format === 'redactor') {
 
-              // Even though we're sending json,
+              // Even though json is being sent,
               // the redactor plugin fails unless
               // the content type is set to text/html
 
-              res.header('Content-Type', 'text/html');
-              res.end(JSON.stringify(response));
+              res.header('Content-Type', 'text/html')
+              res.end(JSON.stringify(response))
 
             } else {
-              res.json(response);
+              res.json(response)
             }
           }
-        });
+        })
 
-      });
+      })
 
     }
-  );
+  )
 
-  serviceLocator.router.get(
+  // Get a single asset by id
+  sl.router.get(
     '/admin/asset/api/:id',
-    serviceLocator.adminAccessControl.requiredAccess('Asset', 'read'),
+    sl.adminAccessControl.requiredAccess('Asset', 'read'),
     function(req, res) {
-      serviceLocator.assetModel.read(req.params.id, function(err, file) {
+      sl.assetModel.read(req.params.id, function(err, file) {
         if (err) {
-          res.status(500);
-          res.end(JSON.stringify({ error: err }));
-        }
-        else {
-          res.end(JSON.stringify(file));
+          res.status(500)
+          res.end(JSON.stringify({ error: err }))
+        } else {
+          res.end(JSON.stringify(file))
         }
       })
     }
-  );
+  )
 
-  serviceLocator.router.delete(
+  // Delete a single asset by id
+  sl.router.delete(
     '/admin/asset/api/:id',
-    serviceLocator.adminAccessControl.requiredAccess('Asset', 'delete'),
+    sl.adminAccessControl.requiredAccess('Asset', 'delete'),
     function (req, res) {
 
-      var id = req.params.id;
-      serviceLocator.assetModel.delete(id, function (err) {
-        res.json({
-          success: !err
-        });
-      });
+      var id = req.params.id
+      sl.assetModel.delete(id, function (err) {
+        res.json({ success: !err })
+      })
 
     }
-  );
+  )
 
-  serviceLocator.router.put(
+  // Update asset details by id
+  sl.router.put(
     '/admin/asset/api/:id',
-    serviceLocator.adminAccessControl.requiredAccess('Asset', 'update'),
+    sl.adminAccessControl.requiredAccess('Asset', 'update'),
     function (req, res) {
 
-      var id = req.params.id;
-      serviceLocator.assetModel.update(id, req.body, function (err) {
-        res.json({
-          success: !err
-        });
-      });
+      var id = req.params.id
+      sl.assetModel.update(id, req.body, function (err) {
+        res.json({ success: !err })
+      })
 
     }
-  );
+  )
 
-  /*
-   * Admin routes
-   */
-  serviceLocator.router.get(
+  // Admin route
+  // Single page app - logic is in the frontend JS
+  sl.router.get(
     '/admin/asset*',
     assetAccess('read'),
     compact.js(['global'], ['admin'], ['admin-asset']),
@@ -205,8 +211,8 @@ function createRoutes(serviceLocator, viewPath) {
           title: 'Asset Manager',
           section: 'asset'
         }
-      });
+      })
     }
-  );
+  )
 
 }
